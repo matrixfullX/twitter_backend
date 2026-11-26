@@ -3,7 +3,7 @@ from django.db import migrations
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("authentication", "0001_initial"),
+        ("authentication", "0002_user_auth_provider"),
     ]
 
     operations = [
