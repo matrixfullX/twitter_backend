@@ -12,8 +12,7 @@ class ProfileManager(models.Manager):
         """
         from apps.profiles.models import Profile
         
-        profiles = Profile.objects.select_related('user').filter(user__is_verified_email=True)
-        # profiles = Profile.objects.select_related('user').filter(user__is_verified_email=True).exclude(user=me)
+        profiles = Profile.objects.select_related('user').all()
         return profiles
     
     # def get_all_profiles_to_invites(self, sender):

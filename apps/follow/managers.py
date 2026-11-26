@@ -43,7 +43,6 @@ class FollowManager(models.Manager):
             if (
                 u.public_id not in list(set(list_publicId_follow))
                 and u != user
-                and u.is_verified_email
                 and u.is_active
             ):
                 people.append(u)

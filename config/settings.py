@@ -206,7 +206,6 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.SessionAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
-    "DEFAULT_THROTTLE_RATES": {"activation_resend": "5/hour"},
     "DEFAULT_RENDERER_CLASSES": [
         "apps.utils.renderers.CustomJSONRenderer",
     ],
@@ -287,27 +286,6 @@ if ENV == "production" and cloudinary_configured:
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 AUTH_USER_MODEL = "authentication.User"
-
-
-# Email delivery: use the local console backend when SMTP credentials are absent.
-# This keeps account activation testable by printing activation emails in Docker logs.
-EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
-EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
-EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
-EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
-EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "True").strip().lower() in {"1", "true", "yes", "on"}
-_configured_email_backend = os.environ.get("EMAIL_BACKEND", "").strip()
-if _configured_email_backend:
-    # Honor an explicit backend selection. In particular, an explicit SMTP
-    # setting must not silently fall back to console output when credentials
-    # are missing.
-    EMAIL_BACKEND = _configured_email_backend
-elif EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
-    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-else:
-    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend" if ENV == "development" else "django.core.mail.backends.smtp.EmailBackend"
-DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL") or EMAIL_HOST_USER or "webmaster@localhost"
-EMAIL_TIMEOUT = int(os.environ.get("EMAIL_TIMEOUT", "15"))
 
 
 # settings JWT

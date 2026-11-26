@@ -18,7 +18,6 @@ class LoginViewTestCase(APITestCase):
             'last_name': 'DOE',
             'email': 'john.doe@example.com',
             'password': 'testPassword',
-            "is_verified_email": True
         }
         # Créer un utilisateur et le sauvegarder dans la base de données de test
         self.user = User.objects.create_user(**self.user_attributes)
@@ -44,19 +43,16 @@ class LoginViewTestCase(APITestCase):
         # Vérifier que la réponse a un code de statut 400
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_login_email_not_verified(self):
-        # Créer un utilisateur avec une adresse électronique non vérifiée
+    def test_login_succeeds_without_email_activation(self):
         user = User.objects.create_user(
-            email='test@example.com', password='testpass', is_verified_email=False
+            email='unconfirmed@example.com', password='testpass'
         )
-        data = {'email': 'test@example.com', 'password': 'testpass'}
+        response = self.client.post(
+            self.url,
+            data={'email': user.email, 'password': 'testpass'},
+            format='json',
+        )
 
-        # Envoyer une requête POST à la vue avec des données valides
-        response = self.client.post(self.url, data=data, format='json')
-
-        # Vérifier que la réponse a un code de statut 400
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-        # Vérifier que la réponse contient le message d'erreur attendu
-        self.assertEqual(response.data['errors'], res["CONFIRM_YOUR_ADDRESS_EMAIL"])
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('token', response.data)
 

@@ -16,11 +16,6 @@ class User(AbstractUser):
         unique=True,
         help_text=_("Required to authenticate")
     )
-    is_verified_email = models.BooleanField(
-        _('email verified'), 
-        default=False,
-        help_text=_("Specifies whether the user should verify their email address.")
-    )
     auth_provider = models.CharField(max_length=255, blank=False, null=False, default='email')
     last_logout = models.DateTimeField(
         _('last date logout'), 

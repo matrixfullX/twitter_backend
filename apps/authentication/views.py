@@ -1,26 +1,16 @@
-from django.conf import settings
 from django.core.exceptions import BadRequest
-from django.contrib.auth import get_user_model, authenticate
-from django.contrib.sites.shortcuts import get_current_site
+from django.contrib.auth import authenticate
 from django.utils import timezone
-from django.db import transaction
-import logging
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework.response import Response
 from rest_framework import status, viewsets
 from rest_framework.views import APIView
-from rest_framework.throttling import ScopedRateThrottle
 
 from apps.authentication import serializers
 from apps.authentication.social_login import register_user_with_social_account
-from apps.authentication.tokens import TokenGenerator, get_tokens_for_user
-from apps.utils.email import send_email
+from apps.authentication.tokens import get_tokens_for_user
 from apps.utils.response import res
-
-
-User = get_user_model()
-logger = logging.getLogger(__name__)
 
 
 class GoogleLoginView(APIView):
@@ -58,76 +48,12 @@ class SignupView(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs) -> Response:
         serializer = serializers.SignupSerializer(data=request.data)
-        if serializer.is_valid(raise_exception=True):
-            try:
-                with transaction.atomic():
-                    user = serializer.save()
-                    token = TokenGenerator().make_token(user)
-                    send_email(
-                        subject="Activate your Twitter account",
-                        template_name="authentication/mail/activate.html",
-                        user=user,
-                        token=token,
-                        domain=settings.DOMAIN_FRONTEND,
-                    )
-            except Exception:
-                logger.exception("Could not deliver signup activation email")
-                return Response(
-                    {"message": "The activation email could not be delivered. Check the email settings and try again."},
-                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
-                )
-            return Response(
-                {"message": res["SUCCESSFUL_REGISTRATION"]},
-                status=status.HTTP_201_CREATED,
-            )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-class ResendActivationView(APIView):
-    permission_classes = []
-    throttle_classes = [ScopedRateThrottle]
-    throttle_scope = "activation_resend"
-
-    def post(self, request):
-        serializer = serializers.ResendActivationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        email = serializer.validated_data["email"]
-        user = User.objects.filter(email__iexact=email, is_verified_email=False).first()
-        if user:
-            token = TokenGenerator().make_token(user)
-            try:
-                send_email(
-                    subject="Activate your Twitter account",
-                    template_name="authentication/mail/activate.html",
-                    user=user,
-                    token=token,
-                    domain=settings.DOMAIN_FRONTEND,
-                )
-            except Exception:
-                logger.exception("Could not resend account activation email")
-                return Response(
-                    {"message": "The activation email could not be delivered. Check the email settings and try again."},
-                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
-                )
+        serializer.save()
         return Response(
-            {"message": "If the account is awaiting verification, an activation email has been sent."},
-            status=status.HTTP_200_OK,
+            {"message": res["SUCCESSFUL_REGISTRATION"]},
+            status=status.HTTP_201_CREATED,
         )
-
-
-class ActivationView(viewsets.ModelViewSet):
-    permission_classes = []
-    serializer_class = serializers.ActivationSerializer
-    http_method_names = ["post"]
-
-    def create(self, request, *args, **kwargs):
-        serializer = serializers.ActivationSerializer(data=request.data)
-        if serializer.is_valid(raise_exception=True):
-            return Response(
-                {"message": res["SUCCESSFUL_ACTIVATION_ACCOUNT"]},
-                status=status.HTTP_200_OK,
-            )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class LoginView(viewsets.ModelViewSet):
@@ -142,19 +68,13 @@ class LoginView(viewsets.ModelViewSet):
             password = serializer.data.get("password")
             user = authenticate(email=email, password=password)
             if user is not None:
-                if user.is_verified_email:
-                    user.last_login = timezone.now()
-                    user.save()
-                    token = get_tokens_for_user(user)
-                    return Response(
-                        {"message": res["LOGIN_SUCCESS"], "token": token},
-                        status=status.HTTP_200_OK,
-                    )
-                else:
-                    return Response(
-                        {"errors": res["CONFIRM_YOUR_ADDRESS_EMAIL"]},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
+                user.last_login = timezone.now()
+                user.save()
+                token = get_tokens_for_user(user)
+                return Response(
+                    {"message": res["LOGIN_SUCCESS"], "token": token},
+                    status=status.HTTP_200_OK,
+                )
             else:
                 return Response(
                     {"errors": res["EMAIL_OR_PASSWORD_IS_NOT_VALID"]},
@@ -174,41 +94,6 @@ class UserChangePasswordView(viewsets.ModelViewSet):
         if serializer.is_valid(raise_exception=True):
             return Response(
                 {"message": res["PASSWORD_CHANGED_SUCCESSFULLY"]},
-                status=status.HTTP_200_OK,
-            )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-class RequestResetPasswordView(viewsets.ModelViewSet):
-    permission_classes = []
-    serializer_class = serializers.RequestResetPasswordSerializer
-    http_method_names = ["post"]
-
-    def create(self, request, *args, **kwargs):
-        serializer = serializers.RequestResetPasswordSerializer(
-            data=request.data, context={"current_site": get_current_site(request)}
-        )
-        if serializer.is_valid(raise_exception=True):
-            return Response(
-                {"message": res["PASSWORD_RESET_LINK_SEND"]}, status=status.HTTP_200_OK
-            )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-class UserResetPasswordView(viewsets.ModelViewSet):
-    permission_classes = []
-    serializer_class = serializers.UserResetPasswordSerializer
-    http_method_names = ["post"]
-
-    def create(self, request, *args, **kwargs):
-        uidb64 = kwargs.get("uidb64")
-        token = kwargs.get("token")
-        serializer = serializers.UserResetPasswordSerializer(
-            data=request.data, context={"uid": uidb64, "token": token}
-        )
-        if serializer.is_valid(raise_exception=True):
-            return Response(
-                {"message": res["PASSWORD_RESET_SUCCESSFULLY"]},
                 status=status.HTTP_200_OK,
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

@@ -13,7 +13,6 @@ class UserAdmin(BaseUserAdmin):
         "first_name",
         "last_name",
         "is_active",
-        "is_verified_email",
         "is_staff",
         "is_superuser",
         "auth_provider",
@@ -23,7 +22,6 @@ class UserAdmin(BaseUserAdmin):
         "is_superuser",
         "is_staff",
         "is_active",
-        "is_verified_email",
         "date_joined",
     )
     fieldsets = (
@@ -42,7 +40,6 @@ class UserAdmin(BaseUserAdmin):
             {
                 "fields": (
                     "is_active",
-                    "is_verified_email",
                     "is_staff",
                     "is_superuser",
                     "groups",
@@ -74,7 +71,6 @@ class UserAdmin(BaseUserAdmin):
                     "password1",
                     "password2",
                     "is_active",
-                    "is_verified_email",
                     "is_staff",
                 ),
             },

@@ -64,7 +64,6 @@ def register_user_with_social_account(auth_provider, email, first_name, last_nam
     if created:
         user.first_name = first_name
         user.last_name = last_name
-        user.is_verified_email = True
         user.auth_provider = auth_provider
         user.save()
     else:

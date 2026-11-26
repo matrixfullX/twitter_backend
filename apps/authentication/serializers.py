@@ -1,8 +1,5 @@
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.utils.encoding import force_str
-from django.utils.http import urlsafe_base64_decode
-from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.utils.translation import gettext as _
 from django.utils import timezone
 
@@ -11,9 +8,7 @@ from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 
 from apps.authentication.social_login import GoogleLogin
-from apps.authentication.tokens import TokenGenerator
 from apps.authentication.validators import email_validation, password_validation
-from apps.utils.email import send_email
 from apps.utils.response import error_messages, res
 
 
@@ -106,43 +101,6 @@ class SignupSerializer(serializers.ModelSerializer):
         return User.objects.create_user(**validate_data)
 
 
-class ResendActivationSerializer(serializers.Serializer):
-    email = serializers.EmailField()
-
-
-class ActivationSerializer(serializers.Serializer):
-    uidb64 = serializers.CharField(write_only=True)
-    token = serializers.CharField(write_only=True)
-
-    class Meta:
-        fields = [
-            "uidb64",
-            "token",
-        ]
-
-    def validate(self, attrs):
-        uidb64 = attrs.get("uidb64")
-        token = attrs.get("token")
-        try:
-            uid = force_str(urlsafe_base64_decode(uidb64))
-            user = User.objects.get(public_id=uid)
-        except Exception:
-            user = None
-        if user and TokenGenerator().check_token(user, token):
-            if not user.is_verified_email:
-                user.is_verified_email = True
-                user.save()
-                send_email(
-                    subject="Twitter - Your account has been successfully created and activated!",
-                    template_name="authentication/mail/activate_success.html",
-                    user=user,
-                    domain=settings.DOMAIN_FRONTEND,
-                )
-        else:
-            raise serializers.ValidationError(res["TOKEN_IS_NOT_VALID_OR_HAS_EXPIRED"])
-        return attrs
-
-
 class LoginSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(
         max_length=255,
@@ -200,88 +158,6 @@ class UserChangePasswordSerializer(serializers.Serializer):
             )
         user.set_password(password)
         user.save()
-        return attrs
-
-
-class RequestResetPasswordSerializer(serializers.Serializer):
-    email = serializers.EmailField(
-        max_length=255,
-        error_messages={
-            "blank": error_messages("blank", "fr", "email"),
-            "required": error_messages("required", "fr", "email"),
-        },
-    )
-
-    class Meta:
-        fields = ["email"]
-
-    def validate(self, attrs):
-        email = attrs.get("email")
-        # current_site = self.context.get('current_site')
-        if User.objects.filter(email=email).exists():
-            user = User.objects.get(email=email)
-            token = PasswordResetTokenGenerator().make_token(user)
-            send_email(
-                subject="Twitter - Request to reset your password",
-                template_name="authentication/mail/send_email_reset_password.html",
-                user=user,
-                token=token,
-                domain=settings.DOMAIN_FRONTEND,
-            )
-        else:
-            raise serializers.ValidationError(res["EMAIL_ADDRESS_DOES_NOT_EXIST"])
-        return attrs
-
-
-class UserResetPasswordSerializer(serializers.Serializer):
-    password = serializers.CharField(
-        max_length=128,
-        style={"input_type": "password"},
-        write_only=True,
-        validators=[password_validation],
-        error_messages={
-            "blank": error_messages("blank", "fr", "Mot de passe"),
-            "required": error_messages("required", "fr", "Mot de passe"),
-        },
-    )
-    confirm_password = serializers.CharField(
-        max_length=128,
-        style={"input_type": "password"},
-        write_only=True,
-        error_messages={
-            "blank": error_messages("blank", "fr", "Comfirmation mot de passe"),
-            "required": error_messages("required", "fr", "Confirmation mot de passe"),
-        },
-    )
-
-    class Meta:
-        fields = ["password", "confirm_password"]
-
-    def validate(self, attrs):
-        password = attrs.get("password")
-        confirm_password = attrs.get("confirm_password")
-        uid = self.context.get("uid")
-        token = self.context.get("token")
-        if password != confirm_password:
-            raise serializers.ValidationError(
-                res["PASSWORD_AND_PASSWORD_CONFIRM_NOT_MATCH"]
-            )
-        try:
-            uid = force_str(urlsafe_base64_decode(uid))
-            user = User.objects.get(public_id=uid)
-        except Exception:
-            user = None
-        if user and PasswordResetTokenGenerator().check_token(user, token):
-            user.set_password(password)
-            user.save()
-            send_email(
-                subject="Twitter - Your password has been successfully changed!",
-                template_name="authentication/mail/password_rest_success.html",
-                user=user,
-                domain=settings.DOMAIN_FRONTEND,
-            )
-        else:
-            raise serializers.ValidationError(res["TOKEN_IS_NOT_VALID_OR_HAS_EXPIRED"])
         return attrs
 
 
